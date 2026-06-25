@@ -414,12 +414,6 @@ Satsend is open source and welcomes contributions at every level.
 - **TypeScript** — strict mode, no `any`, named exports only. Test files mirror source structure.
 - **Commits** — use conventional commit format: `feat:`, `fix:`, `test:`, `docs:`, `refactor:`
 
-### Good first issues
-
-- Add an `is-expired` read-only function that returns a boolean for a given invoice ID
-- Add a `get-invoices-by-creator` index (note: Clarity maps are not iterable — this requires a secondary data structure)
-- Improve test coverage for edge cases at exact deadline block heights
-
 ---
 
 ## License
