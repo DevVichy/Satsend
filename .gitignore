@@ -1,0 +1,21 @@
+# Clarinet
+.cache/
+target/
+
+# Node
+node_modules/
+
+# Frontend — scaffold exists locally but is out of scope for this phase.
+# Will be added in a future commit once the contract is deployed on testnet.
+frontend/
+
+# Secrets — never commit mnemonics
+settings/Testnet.toml
+settings/Mainnet.toml
+
+# Claude Code internal files
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
