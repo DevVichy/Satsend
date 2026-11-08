@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Cl, cvToValue } from "@stacks/transactions";
+import { Cl, ClarityType, type ClarityValue, type TupleCV } from "@stacks/transactions";
 import { initSimnet } from "@hirosystems/clarinet-sdk";
 
 // ---------------------------------------------------------------------------
@@ -25,6 +25,23 @@ function mintSbtc(recipient: string, amount: number) {
     [Cl.uint(amount), Cl.principal(recipient)],
     deployer
   );
+}
+
+// Helper: read a uint out of a Clarity value, unwrapping an `(ok ...)` response.
+function uintOf(cv: ClarityValue): number {
+  const inner = cv.type === ClarityType.ResponseOk ? cv.value : cv;
+  if (inner.type !== ClarityType.UInt) {
+    throw new Error(`expected a uint, got ${ClarityType[inner.type]}`);
+  }
+  return Number(inner.value);
+}
+
+// Helper: read the fields of an invoice returned by `get-invoice` (an `(some {...})`).
+function invoiceOf(cv: ClarityValue): TupleCV["data"] {
+  if (cv.type !== ClarityType.OptionalSome || cv.value.type !== ClarityType.Tuple) {
+    throw new Error("expected (some tuple)");
+  }
+  return cv.value.data;
 }
 
 // Helper: create an invoice as `caller`
@@ -87,8 +104,7 @@ describe("create-invoice", () => {
     createInvoice(1_000_000, 100, "First", alice);
     const { result } = createInvoice(2_000_000, 200, "Second", bob);
     // IDs depend on call order within the test suite; just check it is a uint > 0
-    const id = (cvToValue(result) as any).value;
-    expect(Number(id)).toBeGreaterThan(0);
+    expect(uintOf(result)).toBeGreaterThan(0);
   });
 
   it("rejects amount = 0", () => {
@@ -128,16 +144,17 @@ describe("create-invoice", () => {
     const count = simnet.callReadOnlyFn(
       SATSEND, "get-invoice-count", [], deployer
     );
-    const latestId = Number((cvToValue(count.result) as any).value);
+    const latestId = uintOf(count.result);
 
     const { result } = getInvoice(latestId);
-    const invoice = cvToValue(result) as any;
+    const invoice = invoiceOf(result);
 
-    expect(invoice.value.creator.value).toBe(alice);
-    expect(Number(invoice.value.amount.value)).toBe(amount);
-    expect(invoice.value.memo.value).toBe(memo);
-    expect(invoice.value.status.value).toBe("pending");
-    expect(invoice.value.payer.value).toBeNull();
+    expect(invoice.creator).toStrictEqual(Cl.principal(alice));
+    expect(invoice.amount).toStrictEqual(Cl.uint(amount));
+    expect(invoice.deadline).toStrictEqual(Cl.uint(expectedDeadline));
+    expect(invoice.memo).toStrictEqual(Cl.stringAscii(memo));
+    expect(invoice.status).toStrictEqual(Cl.stringAscii("pending"));
+    expect(invoice.payer).toStrictEqual(Cl.none());
   });
 });
 
@@ -151,33 +168,30 @@ describe("pay-invoice", () => {
     // Alice creates an invoice; bob will pay it
     mintSbtc(bob, AMOUNT * 2);
     const { result } = createInvoice(AMOUNT, 100, "Payment test", alice);
-    invoiceId = Number((cvToValue(result) as any).value);
+    invoiceId = uintOf(result);
   });
 
   it("settles the invoice and transfers sBTC to creator", () => {
-    const aliceBalanceBefore = cvToValue(
+    const aliceBalanceBefore = uintOf(
       simnet.callReadOnlyFn(SBTC, "get-balance", [Cl.principal(alice)], deployer).result
-    ) as any;
+    );
 
     const { result } = payInvoice(invoiceId, bob);
     expect(result).toBeOk(Cl.bool(true));
 
-    const aliceBalanceAfter = cvToValue(
+    const aliceBalanceAfter = uintOf(
       simnet.callReadOnlyFn(SBTC, "get-balance", [Cl.principal(alice)], deployer).result
-    ) as any;
+    );
 
-    const diff =
-      Number(aliceBalanceAfter.value.value) -
-      Number(aliceBalanceBefore.value.value);
-    expect(diff).toBe(AMOUNT);
+    expect(aliceBalanceAfter - aliceBalanceBefore).toBe(AMOUNT);
   });
 
   it("marks the invoice as settled after payment", () => {
     payInvoice(invoiceId, bob);
     const { result } = getInvoice(invoiceId);
-    const invoice = cvToValue(result) as any;
-    expect(invoice.value.status.value).toBe("settled");
-    expect(invoice.value.payer.value.value).toBe(bob);
+    const invoice = invoiceOf(result);
+    expect(invoice.status).toStrictEqual(Cl.stringAscii("settled"));
+    expect(invoice.payer).toStrictEqual(Cl.some(Cl.principal(bob)));
   });
 
   it("rejects double payment on an already-settled invoice", () => {
@@ -205,9 +219,10 @@ describe("pay-invoice", () => {
   });
 
   it("rejects payment after deadline has passed", () => {
-    // Create invoice with deadline 1 block in the future, then mine past it
-    const { result: createResult } = createInvoice(AMOUNT, 1, "Short deadline", alice);
-    const shortId = Number((cvToValue(createResult) as any).value);
+    // The create call itself executes one block ahead of simnet.blockHeight, so a
+    // deadline offset of 1 would equal the current block and be rejected. Use 2.
+    const { result: createResult } = createInvoice(AMOUNT, 2, "Short deadline", alice);
+    const shortId = uintOf(createResult);
 
     // Mine enough blocks to pass the deadline
     simnet.mineEmptyBlocks(5);
@@ -224,7 +239,7 @@ describe("cancel-invoice", () => {
 
   beforeEach(() => {
     const { result } = createInvoice(1_000_000, 100, "Cancel test", alice);
-    invoiceId = Number((cvToValue(result) as any).value);
+    invoiceId = uintOf(result);
   });
 
   it("allows creator to cancel a pending invoice", () => {
@@ -235,8 +250,7 @@ describe("cancel-invoice", () => {
   it("marks invoice as cancelled after cancellation", () => {
     cancelInvoice(invoiceId, alice);
     const { result } = getInvoice(invoiceId);
-    const invoice = cvToValue(result) as any;
-    expect(invoice.value.status.value).toBe("cancelled");
+    expect(invoiceOf(result).status).toStrictEqual(Cl.stringAscii("cancelled"));
   });
 
   it("rejects cancellation by a non-creator", () => {
@@ -276,9 +290,9 @@ describe("get-invoice", () => {
     const count = simnet.callReadOnlyFn(
       SATSEND, "get-invoice-count", [], deployer
     );
-    const id = Number((cvToValue(count.result) as any).value);
+    const id = uintOf(count.result);
     const { result } = getInvoice(id);
-    expect(result).toBeSome();
+    expect(invoiceOf(result).memo).toStrictEqual(Cl.stringAscii("Test memo"));
   });
 });
 
@@ -291,21 +305,17 @@ describe("get-invoice-count", () => {
     const { result } = simnet.callReadOnlyFn(
       SATSEND, "get-invoice-count", [], deployer
     );
-    const count = Number((cvToValue(result) as any).value);
+    const count = uintOf(result);
     expect(count).toBeGreaterThanOrEqual(0);
   });
 
   it("increments after each create-invoice call", () => {
-    const before = Number(
-      (cvToValue(
-        simnet.callReadOnlyFn(SATSEND, "get-invoice-count", [], deployer).result
-      ) as any).value
+    const before = uintOf(
+      simnet.callReadOnlyFn(SATSEND, "get-invoice-count", [], deployer).result
     );
     createInvoice(1_000_000, 10, "Counter test", alice);
-    const after = Number(
-      (cvToValue(
-        simnet.callReadOnlyFn(SATSEND, "get-invoice-count", [], deployer).result
-      ) as any).value
+    const after = uintOf(
+      simnet.callReadOnlyFn(SATSEND, "get-invoice-count", [], deployer).result
     );
     expect(after).toBe(before + 1);
   });
