@@ -313,7 +313,7 @@ npm install
 npm test
 ```
 
-All 18 unit tests should pass. If you see errors, make sure your Node version is 18+ and Clarinet is installed.
+All 23 unit tests should pass. If you see errors, make sure your Node version is 18+ and Clarinet is installed.
 
 ### Explore in the Clarinet REPL
 
@@ -374,7 +374,7 @@ Your contract will be live at `<deployer-address>.satsend`.
 
 ### Phase 1 — Testnet (now)
 - [x] Core Clarity contract: `create-invoice`, `pay-invoice`, `cancel-invoice`, `get-invoice`
-- [x] Full unit test suite (18 tests, happy path + all error states)
+- [x] Full unit test suite (23 tests, happy path + all error states)
 - [ ] Frontend: React + Stacks.js wallet connection, create and pay invoice UI
 - [ ] Testnet deployment and public demo
 
