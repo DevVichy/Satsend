@@ -23,7 +23,7 @@
 (define-read-only (get-total-supply) (ok (ft-get-supply sbtc)))
 (define-read-only (get-token-uri) (ok none))
 
-;; Mint for testing only — not present in real sBTC contract
+;; Mint for testing only - not present in real sBTC contract
 (define-public (mint (amount uint) (recipient principal))
   (ft-mint? sbtc amount recipient)
 )

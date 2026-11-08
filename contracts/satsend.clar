@@ -1,12 +1,12 @@
 ;; satsend.clar
 ;; On-chain sBTC invoice protocol.
 ;;
-;; Flow: creator calls create-invoice → shares link with payer →
-;; payer calls pay-invoice (sBTC transfers on-chain) → invoice marked settled.
+;; Flow: creator calls create-invoice -> shares link with payer ->
+;; payer calls pay-invoice (sBTC transfers on-chain) -> invoice marked settled.
 ;;
 ;; The sBTC token is accepted via the SIP-010 trait rather than a hardcoded
 ;; contract address. This means the same contract works on testnet and mainnet
-;; without redeployment — the caller passes the appropriate sBTC principal.
+;; without redeployment - the caller passes the appropriate sBTC principal.
 
 ;; ---------------------------------------------------------------------------
 ;; Traits
@@ -20,7 +20,7 @@
 )
 
 ;; ---------------------------------------------------------------------------
-;; Constants — error codes
+;; Constants - error codes
 ;; ---------------------------------------------------------------------------
 
 (define-constant ERR-INVALID-AMOUNT    (err u100))
@@ -81,9 +81,9 @@
 
 ;; create-invoice
 ;; Creates a new invoice stored on-chain.
-;; `amount`   — sBTC in satoshis (must be > 0)
-;; `deadline` — Stacks block height after which the invoice expires (must be future)
-;; `memo`     — free-text description shown to the payer
+;; `amount`   - sBTC in satoshis (must be > 0)
+;; `deadline` - Stacks block height after which the invoice expires (must be future)
+;; `memo`     - free-text description shown to the payer
 ;; Returns the new invoice ID on success.
 (define-public (create-invoice
     (amount   uint)
@@ -112,8 +112,8 @@
 ;; pay-invoice
 ;; Pays an existing invoice by transferring sBTC from tx-sender to the creator.
 ;; The invoice must be pending and within its deadline.
-;; `invoice-id`    — ID returned by create-invoice
-;; `sbtc-contract` — the SIP-010 sBTC token contract principal
+;; `invoice-id`    - ID returned by create-invoice
+;; `sbtc-contract` - the SIP-010 sBTC token contract principal
 ;; Returns true on successful payment.
 (define-public (pay-invoice
     (invoice-id    uint)
