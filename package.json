@@ -10,6 +10,7 @@
   "devDependencies": {
     "@hirosystems/clarinet-sdk": "^2.6.0",
     "@stacks/transactions": "^6.17.0",
-    "vitest": "^2.0.5"
+    "vitest": "^3.2.7",
+    "vitest-environment-clarinet": "^2.3.0"
   }
 }
